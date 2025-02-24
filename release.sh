@@ -85,13 +85,11 @@ git push --set-upstream origin $RELEASE_BRANCH
 git tag v$NEW_VERSION
 git push origin v$NEW_VERSION
 
-# Create a GitHub release using the GitHub CLI
+# Create a GitHub release using the GitHub CLI (no need to specify 'false' for draft and prerelease)
 echo "Creating GitHub release for tag v$NEW_VERSION"
 gh release create v$NEW_VERSION \
   --title "Release $NEW_VERSION" \
-  --notes "Release version $NEW_VERSION" \
-  --draft false \
-  --prerelease false
+  --notes "Release version $NEW_VERSION"
 
 echo "✅ GitHub release created for tag v$NEW_VERSION"
 
