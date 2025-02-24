@@ -85,13 +85,21 @@ git push --set-upstream origin $RELEASE_BRANCH
 git tag v$NEW_VERSION
 git push origin v$NEW_VERSION
 
-# Create a GitHub release using the GitHub CLI (no need to specify 'false' for draft and prerelease)
+# Create a GitHub release using the GitHub CLI
 echo "Creating GitHub release for tag v$NEW_VERSION"
 gh release create v$NEW_VERSION \
   --title "Release $NEW_VERSION" \
   --notes "Release version $NEW_VERSION"
 
 echo "✅ GitHub release created for tag v$NEW_VERSION"
+
+# Create a GitHub PR for the release branch
+echo "Creating GitHub PR for release branch $RELEASE_BRANCH"
+gh pr create \
+  --base main \
+  --head $RELEASE_BRANCH \
+  --title "Release $NEW_VERSION" \
+  --body "This PR contains the release version $NEW_VERSION and updates gradle.properties to remove the SNAPSHOT suffix."
 
 # Create next snapshot version
 NEXT_PATCH=$((PATCH + 1))
@@ -118,5 +126,14 @@ git add gradle.properties
 git commit -m "Prepare for Next Release"
 git push --set-upstream origin $NEXT_BRANCH
 
-echo "✅ Next version branch pushed: $NEXT_BRANCH"
-echo "🎉 Release process complete! Merge these branches via PRs when ready."
+# Create a GitHub PR for the next version branch
+echo "Creating GitHub PR for next version branch $NEXT_BRANCH"
+gh pr create \
+  --base main \
+  --head $NEXT_BRANCH \
+  --title "Prepare for Next Release ($NEXT_VERSION)" \
+  --body "This PR prepares the repository for the next release by updating gradle.properties with the next snapshot version."
+
+echo "✅ GitHub PR created for next version branch: $NEXT_BRANCH"
+
+echo "🎉 Release process complete! Merge these PRs via GitHub when ready."
