@@ -1,0 +1,60 @@
+plugins {
+    id 'java-library'
+    id 'maven-publish'
+    id("io.freefair.lombok") version "8.12.2"
+    id "com.github.ben-manes.versions" version "0.52.0"
+}
+
+group = 'com.fullbay.util'
+version = '0.0.1-SNAPSHOT'
+description = 'idp-calleridentityverifier-lib'
+java.sourceCompatibility = JavaVersion.VERSION_21
+
+repositories {
+    mavenLocal()
+    mavenCentral()
+    maven {
+        url 'https://fullbay-851725176053.d.codeartifact.us-west-2.amazonaws.com/maven/fullbay-maven/'
+        credentials {
+            username "aws"
+            password "$codeartifactToken"
+        }
+    }
+}
+
+dependencies {
+    // Other dependencies managed by the version catalog
+    implementation(libs.comFasterxmlJacksonCoreJacksonDatabind)
+    implementation(libs.comFasterxmlJacksonDatatypeJacksonDatatypeJsr310)
+    implementation(libs.comFasterxmlJacksonCore)
+    implementation(libs.comFasterxmlJacksonCoreJacksonAnnotations)
+    implementation(libs.comGoogleGuavaGuava)
+    implementation(libs.commonsIoCommonsIo)
+    implementation(libs.commonsLoggingCommonsLogging)
+    implementation(libs.junitJunit)
+    implementation(libs.orgJetbrainsKotlinKotlinStdlibCommon)
+    implementation(libs.orgJetbrainsKotlinKotlinStdlib)
+    implementation(libs.comSquareupOkhttp3Okhttp)
+    implementation(libs.orgSlf4jSlf4jLog4j12)
+}
+
+
+publishing {
+    publications {
+        mavenJava(MavenPublication) {
+            groupId = group
+            artifactId = rootProject.name
+            version = version
+            from components.java
+        }
+    }
+    repositories {
+        maven {
+            url 'https://fullbay-851725176053.d.codeartifact.us-west-2.amazonaws.com/maven/fullbay-maven/'
+            credentials {
+                username "aws"
+                password "$codeartifactToken"
+            }
+        }
+    }
+}
