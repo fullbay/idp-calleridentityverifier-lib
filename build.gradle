@@ -6,7 +6,6 @@ plugins {
 }
 
 group = 'com.fullbay.util'
-version = '0.0.1-SNAPSHOT'
 description = 'idp-calleridentityverifier-lib'
 java.sourceCompatibility = JavaVersion.VERSION_21
 
