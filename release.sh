@@ -26,7 +26,7 @@ if [ ! -f "gradle.properties" ]; then
 fi
 
 # Determine the default branch (main or master)
-DEFAULT_BRANCH=$(git symbolic-ref refs/remotes/origin/HEAD | sed 's@^refs/remotes/origin/@@')
+DEFAULT_BRANCH=$(git branch -r | grep -E 'origin/(main|master)$' | sed 's|origin/||' | head -n 1)
 
 # Ensure we are on the default branch
 CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
@@ -66,6 +66,16 @@ if [ ! -f "./gradlew" ]; then
     echo "🚨 Gradle wrapper not found! Please run 'gradle wrapper' first."
     exit 1
 fi
+
+# Run Gradle build to verify the main branch is not broken
+echo "🔨 Running Gradle build to verify main branch integrity..."
+./gradlew build
+if [ $? -ne 0 ]; then
+    echo "🚨 Gradle build failed! Please fix any build issues before proceeding."
+    exit 1
+fi
+
+echo "✅ Gradle build successful. Main branch is in good shape."
 
 # Ensure gradle.properties contains a version and it's a SNAPSHOT
 PROJECT_VERSION=$(grep "^version=" gradle.properties | cut -d'=' -f2)
