@@ -14,6 +14,11 @@ if ! git rev-parse --is-inside-work-tree &> /dev/null; then
     exit 1
 fi
 
+# Ensure no uncommitted changes exist
+git diff --quiet || { echo "🚨 Uncommitted changes detected! Please commit or stash them before proceeding."; exit 1; }
+
+git diff --cached --quiet || { echo "🚨 Unstaged changes detected! Please commit them before proceeding."; exit 1; }
+
 # Ensure required Gradle files exist
 if [ ! -f "build.gradle" ] && [ ! -f "build.gradle.kts" ]; then
     echo "🚨 No build.gradle or build.gradle.kts file found! Ensure this is a Gradle project."
@@ -39,6 +44,12 @@ fi
 
 # Fetch latest remote changes
 git fetch origin
+
+# Ensure no unpushed changes exist
+if ! git diff --quiet origin/$DEFAULT_BRANCH; then
+    echo "🚨 Unpushed changes detected! Please push them before proceeding."
+    exit 1
+fi
 
 # Ensure Gradle Wrapper is available
 if [ ! -f "./gradlew" ]; then
@@ -92,13 +103,13 @@ git push --set-upstream origin "$RELEASE_BRANCH"
 
 # Create a GitHub release
 echo "🚀 Creating GitHub release for version $NEW_VERSION..."
-gh release create "v$NEW_VERSION" --title "Release $NEW_VERSION" --notes "Official release of version $NEW_VERSION."
-echo "✅ GitHub release v$NEW_VERSION created."
+RELEASE_URL=$(gh release create "v$NEW_VERSION" --title "Release $NEW_VERSION" --notes "Official release of version $NEW_VERSION." --json url -q .url)
+echo "✅ GitHub release v$NEW_VERSION created: $RELEASE_URL"
 
 # Create PR for the release branch
 echo "🛠 Creating GitHub PR for release branch..."
-gh pr create --base "$DEFAULT_BRANCH" --head "$RELEASE_BRANCH" --title "Release $NEW_VERSION" --body "This PR releases version $NEW_VERSION."
-echo "✅ PR for $RELEASE_BRANCH created."
+RELEASE_PR_URL=$(gh pr create --base "$DEFAULT_BRANCH" --head "$RELEASE_BRANCH" --title "Release $NEW_VERSION" --body "This PR releases version $NEW_VERSION." --json url -q .url)
+echo "✅ PR for $RELEASE_BRANCH created: $RELEASE_PR_URL"
 
 # Prepare next snapshot version
 NEXT_PATCH=$((PATCH + 1))
@@ -115,8 +126,8 @@ echo "✅ Prepared next snapshot version: $NEXT_VERSION"
 
 # Create PR for the next snapshot version
 echo "🛠 Creating GitHub PR for next snapshot version..."
-gh pr create --base "$DEFAULT_BRANCH" --head "$NEXT_BRANCH" --title "Prepare next version $NEXT_VERSION" --body "This PR updates the version to $NEXT_VERSION."
-echo "✅ PR for $NEXT_BRANCH created."
+NEXT_PR_URL=$(gh pr create --base "$DEFAULT_BRANCH" --head "$NEXT_BRANCH" --title "Prepare next version $NEXT_VERSION" --body "This PR updates the version to $NEXT_VERSION." --json url -q .url)
+echo "✅ PR for $NEXT_BRANCH created: $NEXT_PR_URL"
 
 # Checkout default branch
 git checkout "$DEFAULT_BRANCH"
@@ -124,6 +135,6 @@ echo "✅ Switched back to default branch: $DEFAULT_BRANCH"
 
 # Explicit PR merge instructions
 echo "📢 IMPORTANT:"
-echo "👉 Merge the PR for the release branch ('$RELEASE_BRANCH') first."
-echo "👉 After the release PR is merged, merge the next version PR ('$NEXT_BRANCH')."
+echo "👉 Merge the PR for the release branch ('$RELEASE_BRANCH') first: $RELEASE_PR_URL"
+echo "👉 After the release PR is merged, merge the next version PR ('$NEXT_BRANCH'): $NEXT_PR_URL"
 echo "✅ Once both PRs are merged, the release process is complete!"
