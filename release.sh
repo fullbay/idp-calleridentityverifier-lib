@@ -26,7 +26,7 @@ if [ ! -f "gradle.properties" ]; then
 fi
 
 # Determine the default branch (main or master)
-DEFAULT_BRANCH=$(git branch -r | grep -E 'origin/(main|master)$' | sed 's|origin/||' | head -n 1)
+DEFAULT_BRANCH=$(git remote show origin | awk '/HEAD branch/ {print $NF}')
 
 # Ensure we are on the default branch
 CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
