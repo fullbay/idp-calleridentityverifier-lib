@@ -90,10 +90,10 @@ git add gradle.properties
 git commit -m "Release version $NEW_VERSION"
 git push --set-upstream origin "$RELEASE_BRANCH"
 
-git tag "v$NEW_VERSION"
-git push origin "v$NEW_VERSION"
-
-echo "✅ Release version $NEW_VERSION completed."
+# Create a GitHub release
+echo "🚀 Creating GitHub release for version $NEW_VERSION..."
+gh release create "v$NEW_VERSION" --title "Release $NEW_VERSION" --notes "Official release of version $NEW_VERSION."
+echo "✅ GitHub release v$NEW_VERSION created."
 
 # Create PR for the release branch
 echo "🛠 Creating GitHub PR for release branch..."
