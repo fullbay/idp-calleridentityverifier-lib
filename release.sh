@@ -103,7 +103,7 @@ git push --set-upstream origin "$RELEASE_BRANCH"
 
 # Create a GitHub release
 echo "🚀 Creating GitHub release for version $NEW_VERSION..."
-RELEASE_URL=$(gh release create "v$NEW_VERSION" --title "Release $NEW_VERSION" --notes "Official release of version $NEW_VERSION." --json url -q .url)
+RELEASE_URL=$(gh release create "v$NEW_VERSION" --title "Release $NEW_VERSION" --notes "Official release of version $NEW_VERSION." | tail -n1)
 echo "✅ GitHub release v$NEW_VERSION created: $RELEASE_URL"
 
 # Create PR for the release branch
