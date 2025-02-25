@@ -2,35 +2,61 @@
 
 set -e  # Exit immediately if a command fails
 
-# Ensure we are on the main branch
+# Ensure GitHub CLI is installed
+if ! command -v gh &> /dev/null; then
+    echo "🚨 GitHub CLI (gh) is not installed! Please install it before proceeding."
+    exit 1
+fi
+
+# Ensure we are in a Git repository
+if ! git rev-parse --is-inside-work-tree &> /dev/null; then
+    echo "🚨 This is not a Git repository! Please run the script inside a valid Git repository."
+    exit 1
+fi
+
+# Ensure required Gradle files exist
+if [ ! -f "build.gradle" ] && [ ! -f "build.gradle.kts" ]; then
+    echo "🚨 No build.gradle or build.gradle.kts file found! Ensure this is a Gradle project."
+    exit 1
+fi
+
+if [ ! -f "gradle.properties" ]; then
+    echo "🚨 No gradle.properties file found! Ensure this file exists before proceeding."
+    exit 1
+fi
+
+# Determine the default branch (main or master)
+DEFAULT_BRANCH=$(git symbolic-ref refs/remotes/origin/HEAD | sed 's@^refs/remotes/origin/@@')
+
+# Ensure we are on the default branch
 CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
-if [ "$CURRENT_BRANCH" != "main" ]; then
+if [ "$CURRENT_BRANCH" != "$DEFAULT_BRANCH" ]; then
     echo "🚨 You are on branch '$CURRENT_BRANCH'."
-    echo "❗ Please switch to 'main' and ensure it's up to date before proceeding."
-    echo "👉 Run: git checkout main && git pull origin main"
+    echo "❗ Please switch to '$DEFAULT_BRANCH' and ensure it's up to date before proceeding."
+    echo "👉 Run: git checkout $DEFAULT_BRANCH && git pull origin $DEFAULT_BRANCH"
     exit 1
 fi
 
 # Fetch latest remote changes
 git fetch origin
 
-# Check if local main is behind remote main
-LOCAL_MAIN=$(git rev-parse @)
-REMOTE_MAIN=$(git rev-parse @{u})
-BASE_MAIN=$(git merge-base @ @{u})
+# Check if local branch is behind remote
+LOCAL_COMMIT=$(git rev-parse @)
+REMOTE_COMMIT=$(git rev-parse @{u})
+BASE_COMMIT=$(git merge-base @ @{u})
 
-if [ "$LOCAL_MAIN" = "$REMOTE_MAIN" ]; then
-    echo "✅ Local 'main' is up to date."
-elif [ "$LOCAL_MAIN" = "$BASE_MAIN" ]; then
-    echo "🚨 Your local 'main' branch is BEHIND the remote."
+if [ "$LOCAL_COMMIT" = "$REMOTE_COMMIT" ]; then
+    echo "✅ Local '$DEFAULT_BRANCH' is up to date."
+elif [ "$LOCAL_COMMIT" = "$BASE_COMMIT" ]; then
+    echo "🚨 Your local '$DEFAULT_BRANCH' branch is BEHIND the remote."
     echo "❗ Please pull the latest changes before proceeding."
-    echo "👉 Run: git pull origin main"
+    echo "👉 Run: git pull origin $DEFAULT_BRANCH"
     exit 1
-elif [ "$REMOTE_MAIN" = "$BASE_MAIN" ]; then
-    echo "⚠️ Your local 'main' branch is AHEAD of remote."
+elif [ "$REMOTE_COMMIT" = "$BASE_COMMIT" ]; then
+    echo "⚠️ Your local '$DEFAULT_BRANCH' branch is AHEAD of remote."
     echo "You may want to push your changes before continuing."
 else
-    echo "🚨 Local and remote 'main' branches have diverged!"
+    echo "🚨 Local and remote '$DEFAULT_BRANCH' branches have diverged!"
     echo "❗ Please manually sync them before proceeding."
     exit 1
 fi
@@ -41,99 +67,68 @@ if [ ! -f "./gradlew" ]; then
     exit 1
 fi
 
-# Check for SNAPSHOT dependencies
-SNAPSHOT_DEPENDENCIES=$(./gradlew dependencies --configuration runtimeClasspath | grep -E "SNAPSHOT" || true)
-
-if [[ ! -z "$SNAPSHOT_DEPENDENCIES" ]]; then
-    echo "🚨 Release blocked! SNAPSHOT dependencies found:"
-    echo "$SNAPSHOT_DEPENDENCIES"
-    echo "❗ Please remove all SNAPSHOT dependencies before proceeding."
+# Ensure gradle.properties contains a version and it's a SNAPSHOT
+PROJECT_VERSION=$(grep "^version=" gradle.properties | cut -d'=' -f2)
+if [[ -z "$PROJECT_VERSION" ]]; then
+    echo "🚨 No 'version' property found in gradle.properties!"
     exit 1
 fi
 
-echo "✅ No SNAPSHOT dependencies found. Proceeding with release."
+if [[ ! "$PROJECT_VERSION" =~ -SNAPSHOT$ ]]; then
+    echo "🚨 The current version ($PROJECT_VERSION) is not a SNAPSHOT version!"
+    echo "❗ Ensure the version ends with '-SNAPSHOT' before proceeding."
+    exit 1
+fi
 
-# Get current version from `gradle.properties`
-PROJECT_VERSION=$(grep "version=" gradle.properties | cut -d'=' -f2)
+echo "✅ Version check passed: $PROJECT_VERSION"
+
+# Extract version parts and prepare release
 IFS='.' read -r MAJOR MINOR PATCH <<< "${PROJECT_VERSION%-SNAPSHOT}"
-
-# Set new release version
 NEW_VERSION="$MAJOR.$MINOR.$PATCH"
 RELEASE_BRANCH="release-$NEW_VERSION"
 
-echo "🚀 Creating release branch: $RELEASE_BRANCH"
-git checkout -b $RELEASE_BRANCH
-
-# Update `gradle.properties` to remove `-SNAPSHOT`
-echo "Updating version in gradle.properties to $NEW_VERSION"
-sed -i "" "s/version=.*-SNAPSHOT/version=$NEW_VERSION/" gradle.properties
-
-# Verify the change
-if grep -q "version=$NEW_VERSION" gradle.properties; then
-    echo "✅ gradle.properties updated to $NEW_VERSION"
-else
-    echo "🚨 Failed to update gradle.properties!"
+# Prompt user for release confirmation
+echo "🚀 Ready to release version \"$NEW_VERSION\" and prepare \"$MAJOR.$MINOR.$((PATCH+1))-SNAPSHOT\""
+read -p "Proceed? (y/n): " CONFIRM
+if [[ "$CONFIRM" != "y" ]]; then
+    echo "❌ Release cancelled."
     exit 1
 fi
 
-# Commit and push release branch
+# Create release branch
+git checkout -b "$RELEASE_BRANCH"
+
+# Update gradle.properties to remove -SNAPSHOT
+sed -i "" "s/version=.*/version=$NEW_VERSION/" gradle.properties
+
 git add gradle.properties
-git commit -m "Release Version $NEW_VERSION"
-git push --set-upstream origin $RELEASE_BRANCH
+git commit -m "Release version $NEW_VERSION"
+git push --set-upstream origin "$RELEASE_BRANCH"
 
-# Create and push a Git tag for the release
-git tag v$NEW_VERSION
-git push origin v$NEW_VERSION
+git tag "v$NEW_VERSION"
+git push origin "v$NEW_VERSION"
 
-# Create a GitHub release using the GitHub CLI
-echo "Creating GitHub release for tag v$NEW_VERSION"
-gh release create v$NEW_VERSION \
-  --title "Release $NEW_VERSION" \
-  --notes "Release version $NEW_VERSION"
+echo "✅ Release version $NEW_VERSION completed."
 
-echo "✅ GitHub release created for tag v$NEW_VERSION"
-
-# Create a GitHub PR for the release branch
-echo "Creating GitHub PR for release branch $RELEASE_BRANCH"
-gh pr create \
-  --base main \
-  --head $RELEASE_BRANCH \
-  --title "Release $NEW_VERSION" \
-  --body "This PR contains the release version $NEW_VERSION and updates gradle.properties to remove the SNAPSHOT suffix."
-
-# Create next snapshot version
+# Prepare next snapshot version
 NEXT_PATCH=$((PATCH + 1))
 NEXT_VERSION="$MAJOR.$MINOR.$NEXT_PATCH-SNAPSHOT"
 NEXT_BRANCH="next-version-$NEXT_VERSION"
 
-echo "🚀 Creating next version branch: $NEXT_BRANCH"
-git checkout -b $NEXT_BRANCH
-
-# Update `gradle.properties` to the next snapshot version
-echo "Updating version in gradle.properties to $NEXT_VERSION"
+git checkout -b "$NEXT_BRANCH"
 sed -i "" "s/version=.*/version=$NEXT_VERSION/" gradle.properties
-
-# Verify the change
-if grep -q "version=$NEXT_VERSION" gradle.properties; then
-    echo "✅ gradle.properties updated to $NEXT_VERSION"
-else
-    echo "🚨 Failed to update gradle.properties!"
-    exit 1
-fi
-
-# Commit and push next version branch
 git add gradle.properties
-git commit -m "Prepare for Next Release"
-git push --set-upstream origin $NEXT_BRANCH
+git commit -m "Prepare for next release $NEXT_VERSION"
+git push --set-upstream origin "$NEXT_BRANCH"
 
-# Create a GitHub PR for the next version branch
-echo "Creating GitHub PR for next version branch $NEXT_BRANCH"
-gh pr create \
-  --base main \
-  --head $NEXT_BRANCH \
-  --title "Prepare for Next Release ($NEXT_VERSION)" \
-  --body "This PR prepares the repository for the next release by updating gradle.properties with the next snapshot version."
+echo "✅ Prepared next snapshot version: $NEXT_VERSION"
 
-echo "✅ GitHub PR created for next version branch: $NEXT_BRANCH"
+# Checkout default branch
+git checkout "$DEFAULT_BRANCH"
+echo "✅ Switched back to default branch: $DEFAULT_BRANCH"
 
-echo "🎉 Release process complete! Merge these PRs via GitHub when ready."
+# Explicit PR merge instructions
+echo "📢 IMPORTANT:"
+echo "👉 Merge the PR for the release branch ('$RELEASE_BRANCH') first."
+echo "👉 After the release PR is merged, merge the next version PR ('$NEXT_BRANCH')."
+echo "✅ Once both PRs are merged, the release process is complete!"
