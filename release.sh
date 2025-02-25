@@ -108,7 +108,7 @@ echo "✅ GitHub release v$NEW_VERSION created: $RELEASE_URL"
 
 # Create PR for the release branch
 echo "🛠 Creating GitHub PR for release branch..."
-RELEASE_PR_URL=$(gh pr create --base "$DEFAULT_BRANCH" --head "$RELEASE_BRANCH" --title "Release $NEW_VERSION" --body "This PR releases version $NEW_VERSION." --json url -q .url)
+RELEASE_PR_URL=$(gh pr create --base "$DEFAULT_BRANCH" --head "$RELEASE_BRANCH" --title "Release $NEW_VERSION" --body "This PR releases version $NEW_VERSION." | tail -n1)
 echo "✅ PR for $RELEASE_BRANCH created: $RELEASE_PR_URL"
 
 # Prepare next snapshot version
@@ -126,7 +126,7 @@ echo "✅ Prepared next snapshot version: $NEXT_VERSION"
 
 # Create PR for the next snapshot version
 echo "🛠 Creating GitHub PR for next snapshot version..."
-NEXT_PR_URL=$(gh pr create --base "$DEFAULT_BRANCH" --head "$NEXT_BRANCH" --title "Prepare next version $NEXT_VERSION" --body "This PR updates the version to $NEXT_VERSION." --json url -q .url)
+NEXT_PR_URL=$(gh pr create --base "$DEFAULT_BRANCH" --head "$NEXT_BRANCH" --title "Prepare next version $NEXT_VERSION" --body "This PR updates the version to $NEXT_VERSION." | tail -n1)
 echo "✅ PR for $NEXT_BRANCH created: $NEXT_PR_URL"
 
 # Checkout default branch
