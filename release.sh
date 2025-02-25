@@ -40,27 +40,6 @@ fi
 # Fetch latest remote changes
 git fetch origin
 
-# Check if local branch is behind remote
-LOCAL_COMMIT=$(git rev-parse @)
-REMOTE_COMMIT=$(git rev-parse @{u})
-BASE_COMMIT=$(git merge-base @ @{u})
-
-if [ "$LOCAL_COMMIT" = "$REMOTE_COMMIT" ]; then
-    echo "✅ Local '$DEFAULT_BRANCH' is up to date."
-elif [ "$LOCAL_COMMIT" = "$BASE_COMMIT" ]; then
-    echo "🚨 Your local '$DEFAULT_BRANCH' branch is BEHIND the remote."
-    echo "❗ Please pull the latest changes before proceeding."
-    echo "👉 Run: git pull origin $DEFAULT_BRANCH"
-    exit 1
-elif [ "$REMOTE_COMMIT" = "$BASE_COMMIT" ]; then
-    echo "⚠️ Your local '$DEFAULT_BRANCH' branch is AHEAD of remote."
-    echo "You may want to push your changes before continuing."
-else
-    echo "🚨 Local and remote '$DEFAULT_BRANCH' branches have diverged!"
-    echo "❗ Please manually sync them before proceeding."
-    exit 1
-fi
-
 # Ensure Gradle Wrapper is available
 if [ ! -f "./gradlew" ]; then
     echo "🚨 Gradle wrapper not found! Please run 'gradle wrapper' first."
@@ -97,7 +76,6 @@ IFS='.' read -r MAJOR MINOR PATCH <<< "${PROJECT_VERSION%-SNAPSHOT}"
 NEW_VERSION="$MAJOR.$MINOR.$PATCH"
 RELEASE_BRANCH="release-$NEW_VERSION"
 
-# Prompt user for release confirmation
 echo "🚀 Ready to release version \"$NEW_VERSION\" and prepare \"$MAJOR.$MINOR.$((PATCH+1))-SNAPSHOT\""
 read -p "Proceed? (y/n): " CONFIRM
 if [[ "$CONFIRM" != "y" ]]; then
@@ -107,10 +85,7 @@ fi
 
 # Create release branch
 git checkout -b "$RELEASE_BRANCH"
-
-# Update gradle.properties to remove -SNAPSHOT
 sed -i "" "s/version=.*/version=$NEW_VERSION/" gradle.properties
-
 git add gradle.properties
 git commit -m "Release version $NEW_VERSION"
 git push --set-upstream origin "$RELEASE_BRANCH"
@@ -119,6 +94,11 @@ git tag "v$NEW_VERSION"
 git push origin "v$NEW_VERSION"
 
 echo "✅ Release version $NEW_VERSION completed."
+
+# Create PR for the release branch
+echo "🛠 Creating GitHub PR for release branch..."
+gh pr create --base "$DEFAULT_BRANCH" --head "$RELEASE_BRANCH" --title "Release $NEW_VERSION" --body "This PR releases version $NEW_VERSION."
+echo "✅ PR for $RELEASE_BRANCH created."
 
 # Prepare next snapshot version
 NEXT_PATCH=$((PATCH + 1))
@@ -132,6 +112,11 @@ git commit -m "Prepare for next release $NEXT_VERSION"
 git push --set-upstream origin "$NEXT_BRANCH"
 
 echo "✅ Prepared next snapshot version: $NEXT_VERSION"
+
+# Create PR for the next snapshot version
+echo "🛠 Creating GitHub PR for next snapshot version..."
+gh pr create --base "$DEFAULT_BRANCH" --head "$NEXT_BRANCH" --title "Prepare next version $NEXT_VERSION" --body "This PR updates the version to $NEXT_VERSION."
+echo "✅ PR for $NEXT_BRANCH created."
 
 # Checkout default branch
 git checkout "$DEFAULT_BRANCH"
