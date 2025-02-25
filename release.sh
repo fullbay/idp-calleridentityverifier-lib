@@ -8,6 +8,12 @@ if ! command -v gh &> /dev/null; then
     exit 1
 fi
 
+# Ensure GitHub CLI is authenticated
+if ! gh auth status &> /dev/null; then
+    echo "🚨 GitHub CLI is not authenticated! Please authenticate using 'gh auth login' before proceeding."
+    exit 1
+fi
+
 # Ensure we are in a Git repository
 if ! git rev-parse --is-inside-work-tree &> /dev/null; then
     echo "🚨 This is not a Git repository! Please run the script inside a valid Git repository."
